@@ -11,9 +11,6 @@ const client = new BedrockRuntimeClient({
 });
 
 export class AWSTitanEmbedding {
-  constructor() {
-    console.log("embedding:", this.constructor.name);
-  }
   public static async embedding(input: string): Promise<number[]> {
     const response = await client.send(
       new InvokeModelCommand({

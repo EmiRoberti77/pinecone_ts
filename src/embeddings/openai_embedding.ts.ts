@@ -6,9 +6,6 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 export class OpenAIEmbedding {
-  constructor() {
-    console.log("embedding:", this.constructor.name);
-  }
   public static async embedding(input: string): Promise<number[]> {
     const queryEmbedding = await openai.embeddings.create({
       model: MODEL,
