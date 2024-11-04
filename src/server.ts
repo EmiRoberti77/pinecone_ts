@@ -8,6 +8,8 @@ import {
 import dotenv from "dotenv";
 import { OpenAIEmbedding } from "./embeddings/openai_embedding.ts";
 import { AWSTitanEmbedding } from "./embeddings/aws_titan_embeddings.js";
+import pdfParse from "pdf-parse";
+import fs from "fs";
 dotenv.config();
 
 const enum INDEX_ACTION {
@@ -21,35 +23,29 @@ const config = {
     includeValues: false,
     includeMetadata: true,
   },
-  namespace: "ns_emi", // Pinecone namespace
-  indexName: "document-index", // Pinecone index name
+  namespace: "ns_emi_pdf", // Pinecone namespace
+  indexName: "pdf-search-index", // Pinecone index name
   embeddingID: "id_emi", // Embedding identifier
   dimension: 1536,
   metric: "cosine",
   cloud: "aws",
   region: "us-east-1",
+  pdfPath: "./pdf/report.pdf",
   query: "What is my dog's name?",
 };
-
-const metadataToEmded = [
-  {
-    textToEmbed: "my dog name is leroy",
-    extaInfo: [
-      "likes running",
-      "likes walking",
-      "likes palying with ball",
-      "likes eating my food",
-    ],
-  },
-  {
-    textToEmbed: "I drive an Audi TT",
-    extaInfo: ["black", "sports car", "turbo"],
-  },
-];
 
 const pineCone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!,
 });
+
+async function parsePdf() {
+  const pdfBuffer = fs.readFileSync(config.pdfPath);
+  const pdfData = await pdfParse(pdfBuffer);
+  const chunks = pdfData.text.match(/(.+?(\n{2,}|\f|$))/g) || [];
+  return chunks
+    .map((chunk) => chunk.trim())
+    .filter((chunk) => chunk.length > 0);
+}
 
 async function manageIndexes(indexAction: INDEX_ACTION) {
   const existingIndexes = await pineCone.listIndexes();
@@ -100,13 +96,15 @@ async function isIndexValid() {
 }
 
 async function embeddMetadata() {
+  const metadataToEmded = await parsePdf();
+  console.log(metadataToEmded);
   await Promise.all(
     metadataToEmded.map(async (item, index) => {
       let embedding;
       if (process.env.EMBEDDING_MODE === "AWS") {
-        embedding = await AWSTitanEmbedding.embedding(item.textToEmbed);
+        embedding = await AWSTitanEmbedding.embedding(item);
       } else {
-        embedding = await OpenAIEmbedding.embedding(item.textToEmbed);
+        embedding = await OpenAIEmbedding.embedding(item);
       }
 
       const indexName = config.indexName;
@@ -115,7 +113,7 @@ async function embeddMetadata() {
         {
           id: id,
           values: embedding,
-          metadata: { ...item },
+          //metadata: { ...item },
         },
       ]);
 
