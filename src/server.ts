@@ -76,12 +76,28 @@ async function embeddMetadata() {
   );
 }
 
+async function queryEmbedding() {
+  const queryEmbedding = await openai.embeddings.create({
+    model: "text-embedding-ada-002",
+    input: config.query,
+  });
+
+  const queryResult = await pineCone.index(config.indexName).query({
+    ...config.similarityQuery,
+    vector: queryEmbedding.data[0].embedding,
+  });
+
+  console.log("result:", queryResult);
+  console.table(queryResult.matches);
+}
+
 async function main() {
   if (!(await isIndexValid())) {
     console.log(`Error:${config.indexName} not found`);
     return;
   }
-  await embeddMetadata();
+  //await embeddMetadata();
+  await queryEmbedding();
 }
 
 main();
