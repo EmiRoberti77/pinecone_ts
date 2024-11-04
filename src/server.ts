@@ -1,8 +1,19 @@
-import { IndexModel, Pinecone } from "@pinecone-database/pinecone";
+import {
+  CreateIndexRequestMetricEnum,
+  Index,
+  IndexModel,
+  Pinecone,
+  ServerlessSpecCloudEnum,
+} from "@pinecone-database/pinecone";
 import dotenv from "dotenv";
 import { OpenAIEmbedding } from "./embeddings/openai_embedding.ts";
 import { AWSTitanEmbedding } from "./embeddings/aws_titan_embeddings.js";
 dotenv.config();
+
+const enum INDEX_ACTION {
+  CREATE = "create",
+  DELETE = "delete",
+}
 
 const config = {
   similarityQuery: {
@@ -16,7 +27,7 @@ const config = {
   dimension: 1536,
   metric: "cosine",
   cloud: "aws",
-  region: "us-west-2",
+  region: "us-east-1",
   query: "What is my dog's name?",
 };
 
@@ -39,6 +50,44 @@ const metadataToEmded = [
 const pineCone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!,
 });
+
+async function manageIndexes(indexAction: INDEX_ACTION) {
+  const existingIndexes = await pineCone.listIndexes();
+  const indexFound: IndexModel | undefined = existingIndexes.indexes?.find(
+    (index) => index.name === config.indexName
+  );
+
+  switch (indexAction) {
+    case INDEX_ACTION.CREATE:
+      if (indexFound) {
+        console.log(`Found:${config.indexName}-no create required`);
+        return;
+      }
+
+      await pineCone.createIndex({
+        name: config.indexName,
+        dimension: config.dimension,
+        metric: config.metric as any,
+        spec: {
+          serverless: {
+            cloud: config.cloud as any,
+            region: config.region,
+          },
+        },
+      });
+      //await waitForIndexReady();
+      console.log(`Created:${config.indexName}`);
+      break;
+    case INDEX_ACTION.DELETE:
+      if (!indexFound) {
+        console.log(`Not Found:${config.indexName}-no need to delete`);
+        return;
+      }
+      await pineCone.deleteIndex(config.indexName);
+      console.log(`deleted:${config.indexName}`);
+      break;
+  }
+}
 
 async function isIndexValid() {
   const existingIndexes = await pineCone.listIndexes();
@@ -75,6 +124,19 @@ async function embeddMetadata() {
   );
 }
 
+async function waitForIndexReady() {
+  while (true) {
+    const indexDescription = await pineCone.describeIndex(config.indexName);
+    if (indexDescription.status.ready) {
+      console.log(`Index ${config.indexName} is ready`);
+      break;
+    } else {
+      console.log(`waiting for ${config.indexName} to be ready`);
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+    }
+  }
+}
+
 async function queryEmbedding() {
   let queryEmbedding;
   if (process.env.EMBEDDING_MODE === "AWS") {
@@ -88,15 +150,13 @@ async function queryEmbedding() {
     vector: queryEmbedding,
   });
 
-  console.log("result:", queryResult);
+  //console.log("result:", queryResult);
   console.table(queryResult.matches);
 }
 
 async function main() {
-  if (!(await isIndexValid())) {
-    console.log(`Error:${config.indexName} not found`);
-    return;
-  }
+  //await maangeIndexes(INDEX_ACTION.DELETE);
+  await manageIndexes(INDEX_ACTION.CREATE);
   await embeddMetadata();
   await queryEmbedding();
 }
