@@ -8,6 +8,9 @@ Imagine you’ve got a huge stack of words, phrases, images, and all kinds of da
 
 For example, if you have words like cat, dog, and hamster, embeddings might place them close together in this multi-dimensional space because they’re all pets. Meanwhile, words like car and bike would end up in a totally different area. Embeddings make it possible for an AI model to “understand” that certain words or images are related to each other without us having to spell it all out.
 
+![diagram](https://github.com/user-attachments/assets/e09d8af2-7c53-487c-8214-65f118d03bff)
+
+
 ## So Why Do We Need Vector Databases?
 
 Now that we’ve got all these embeddings – essentially, all these points in multi-dimensional space – we need a way to organise, store, and search them fast. This is where vector databases come in. Unlike traditional databases, which are great for structured data like numbers and names, vector databases are designed specifically for embeddings. They can quickly find items that are “similar” based on their position in this space.
