@@ -1,0 +1,25 @@
+{
+  "name": "pinecone_ts_basic",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "build": "npx tsc",
+    "build:run": "npx tsc && node ./dist/server.js"
+  },
+  "keywords": [
+    "AI",
+    "pinecone"
+  ],
+  "author": "Emi Roberti",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^22.8.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@pinecone-database/pinecone": "^4.0.0",
+    "dotenv": "^16.4.5"
+  }
+}
