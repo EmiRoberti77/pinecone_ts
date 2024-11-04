@@ -1,6 +1,7 @@
 import { IndexModel, Pinecone } from "@pinecone-database/pinecone";
-import OpenAI from "openai";
 import dotenv from "dotenv";
+import { OpenAIEmbedding } from "./embeddings/openai_embedding.ts";
+import { AWSTitanEmbedding } from "./embeddings/aws_titan_embeddings.js";
 dotenv.config();
 
 const config = {
@@ -39,10 +40,6 @@ const pineCone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!,
 });
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
-
 async function isIndexValid() {
   const existingIndexes = await pineCone.listIndexes();
   const found: IndexModel | undefined = existingIndexes.indexes?.find(
@@ -56,17 +53,19 @@ async function isIndexValid() {
 async function embeddMetadata() {
   await Promise.all(
     metadataToEmded.map(async (item, index) => {
-      const embedding = await openai.embeddings.create({
-        model: "text-embedding-ada-002",
-        input: item.textToEmbed,
-      });
+      let embedding;
+      if (process.env.EMBEDDING_MODE === "AWS") {
+        embedding = await AWSTitanEmbedding.embedding(item.textToEmbed);
+      } else {
+        embedding = await OpenAIEmbedding.embedding(item.textToEmbed);
+      }
 
       const indexName = config.indexName;
       const id = `${config.embeddingID}-${index}`;
       await pineCone.index(config.indexName).upsert([
         {
           id: id,
-          values: embedding.data[0].embedding,
+          values: embedding,
           metadata: { ...item },
         },
       ]);
@@ -77,14 +76,16 @@ async function embeddMetadata() {
 }
 
 async function queryEmbedding() {
-  const queryEmbedding = await openai.embeddings.create({
-    model: "text-embedding-ada-002",
-    input: config.query,
-  });
+  let queryEmbedding;
+  if (process.env.EMBEDDING_MODE === "AWS") {
+    queryEmbedding = await AWSTitanEmbedding.embedding(config.query);
+  } else {
+    queryEmbedding = await OpenAIEmbedding.embedding(config.query);
+  }
 
   const queryResult = await pineCone.index(config.indexName).query({
     ...config.similarityQuery,
-    vector: queryEmbedding.data[0].embedding,
+    vector: queryEmbedding,
   });
 
   console.log("result:", queryResult);
@@ -96,7 +97,7 @@ async function main() {
     console.log(`Error:${config.indexName} not found`);
     return;
   }
-  //await embeddMetadata();
+  await embeddMetadata();
   await queryEmbedding();
 }
 
