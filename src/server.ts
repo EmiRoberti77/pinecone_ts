@@ -1,16 +1,15 @@
-import {
-  CreateIndexRequestMetricEnum,
-  Index,
-  IndexModel,
-  Pinecone,
-  ServerlessSpecCloudEnum,
-} from "@pinecone-database/pinecone";
+import { IndexModel, Pinecone } from "@pinecone-database/pinecone";
 import dotenv from "dotenv";
 import { OpenAIEmbedding } from "./embeddings/openai_embedding.ts";
 import { AWSTitanEmbedding } from "./embeddings/aws_titan_embeddings.js";
 import pdfParse from "pdf-parse";
 import fs from "fs";
+import OpenAI from "openai";
 dotenv.config();
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
 
 const enum INDEX_ACTION {
   CREATE = "create",
@@ -31,20 +30,33 @@ const config = {
   cloud: "aws",
   region: "us-east-1",
   pdfPath: "./pdf/report.pdf",
-  query: "What is my dog's name?",
+  query: "summarise lending to SMEs",
 };
 
 const pineCone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!,
 });
 
-async function parsePdf() {
+async function parsePdf(): Promise<string[]> {
   const pdfBuffer = fs.readFileSync(config.pdfPath);
+  const bufferInMB = pdfBuffer.length / (1024 * 1024);
+  console.log(`buffer size: ${bufferInMB.toFixed(2)}MB`);
   const pdfData = await pdfParse(pdfBuffer);
-  const chunks = pdfData.text.match(/(.+?(\n{2,}|\f|$))/g) || [];
-  return chunks
-    .map((chunk) => chunk.trim())
-    .filter((chunk) => chunk.length > 0);
+  const pages = pdfData.text
+    .split("\f")
+    .map((page) => page.trim())
+    .filter((page) => page.length > 0);
+  const chunkSize = 500;
+  const chunks: string[] = [];
+  for (const page of pages) {
+    for (let i = 0; i < page.length; i += chunkSize) {
+      const chunk = page.slice(i, i + chunkSize).trim();
+      if (chunk.length > 0) {
+        chunks.push(chunk);
+      }
+    }
+  }
+  return chunks;
 }
 
 async function manageIndexes(indexAction: INDEX_ACTION) {
@@ -85,26 +97,16 @@ async function manageIndexes(indexAction: INDEX_ACTION) {
   }
 }
 
-async function isIndexValid() {
-  const existingIndexes = await pineCone.listIndexes();
-  const found: IndexModel | undefined = existingIndexes.indexes?.find(
-    (index) => index.name === config.indexName
-  );
-  if (!found) return false;
-  console.log(found);
-  return true;
-}
-
 async function embeddMetadata() {
   const metadataToEmded = await parsePdf();
   console.log(metadataToEmded);
   await Promise.all(
-    metadataToEmded.map(async (item, index) => {
+    metadataToEmded.map(async (chunk, index) => {
       let embedding;
       if (process.env.EMBEDDING_MODE === "AWS") {
-        embedding = await AWSTitanEmbedding.embedding(item);
+        embedding = await AWSTitanEmbedding.embedding(chunk);
       } else {
-        embedding = await OpenAIEmbedding.embedding(item);
+        embedding = await OpenAIEmbedding.embedding(chunk);
       }
 
       const indexName = config.indexName;
@@ -113,7 +115,7 @@ async function embeddMetadata() {
         {
           id: id,
           values: embedding,
-          //metadata: { ...item },
+          metadata: { text: chunk },
         },
       ]);
 
@@ -144,12 +146,31 @@ async function queryEmbedding() {
   }
 
   const queryResult = await pineCone.index(config.indexName).query({
-    ...config.similarityQuery,
+    topK: 3,
     vector: queryEmbedding,
+    includeMetadata: true,
   });
 
-  //console.log("result:", queryResult);
-  console.table(queryResult.matches);
+  const context =
+    queryResult.matches
+      ?.map((match) => (match.metadata?.text as string) || "")
+      .join(" ") ?? "";
+
+  const question = config.query;
+
+  const completionResponse = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [
+      { role: "system", content: "You are a helpful assistant." },
+      {
+        role: "user",
+        content: `Based on the following context, answer the question:\n\nContext: ${context}\n\nQuestion: ${question}`,
+      },
+    ],
+  });
+
+  console.table(completionResponse.choices[0].message.content);
+  console.log(completionResponse.choices[0].message.content);
 }
 
 async function main() {
