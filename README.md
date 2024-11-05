@@ -31,4 +31,75 @@ Generative AI, at its core, is about creating something new based on patterns it
 
 The beauty of embeddings is that they give a sort of “common language” for all sorts of data types. Whether it’s text, image, or audio, each item can be converted into a vector. This common language allows AI to mix and match different data types without getting confused – which is a huge deal for applications that need to make sense of varied inputs.
 
+## Overview of the 
+
+### Setup and Configuration:
+	•	The project uses environment variables to manage API keys and configuration options.
+	•	Libraries used include Pinecone, OpenAI, pdf-parse, and dotenv for environment management.
+### Main Components:
+	•	Pinecone Index Management: Creates or deletes a Pinecone index as needed.
+	•	PDF Parsing: Reads a PDF, splits it into manageable chunks, and prepares it for embedding.
+	•	Embedding Creation and Upsert: Generates embeddings for each chunk using OpenAI or AWS Titan and stores them in Pinecone.
+	•	Query System: Allows querying of Pinecone for relevant chunks and generates a response using OpenAI’s GPT-4.
+### Steps in the Code
+
+### Step 1: Environment Configuration
+
+	•	Load configuration and API keys from the .env file.
+	•	Define index and embedding settings such as dimension, metric, and PDF path.
+
+### Step 2: Parse PDF into Chunks
+
+	•	The parsePdf function:
+	•	Reads the PDF file.
+	•	Splits it by pages and then further divides each page into 500-character chunks.
+	•	Returns an array of text chunks ready for embedding.
+
+### Step 3: Manage Pinecone Index
+
+	•	The manageIndexes function:
+	•	Checks if the specified Pinecone index exists.
+	•	Creates or deletes the index based on the action (CREATE or DELETE).
+	•	Configures index dimensions and metric settings (e.g., cosine similarity).
+
+### Step 4: Generate and Upsert Embeddings
+
+	•	The embeddMetadata function:
+	•	Embeds each chunk using OpenAI’s embedding model or AWS Titan.
+	•	Upserts (uploads) the embeddings to Pinecone with unique IDs and stores the original text as metadata.
+
+### Step 5: Query Pinecone and Generate Response
+
+	•	The queryEmbedding function:
+	•	Generates an embedding for the query using OpenAI or AWS Titan.
+	•	Searches Pinecone for the top matches based on cosine similarity.
+	•	Concatenates the matched text chunks to create a context for OpenAI.
+	•	Sends the query to OpenAI’s language model (GPT-4) to generate a response based on the retrieved context.
+
+### Step 6: Main Execution
+
+	•	The main function orchestrates the entire process:
+	•	Manages the index (create if not exists).
+	•	Parses the PDF, generates embeddings, and upserts them into Pinecone.
+	•	Queries Pinecone and generates responses interactively.
+
+### How to Run
+
+### install dependencies
+
+```bash
+npm install
+```
+
+### set up Enviroment variables
+
+
+```bash
+OPENAI_API_KEY=your_openai_api_key
+PINECONE_API_KEY=your_pinecone_api_key
+PINECONE_ENVIRONMENT=your_pinecone_environment
+EMBEDDING_MODE=OPENAI # or "AWS" depending on the embedding service you choose
+```
+
+
 Emi Roberti
