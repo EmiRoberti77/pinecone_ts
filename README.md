@@ -33,6 +33,8 @@ The beauty of embeddings is that they give a sort of “common language” for a
 
 ## Overview of the 
 
+![embedding](https://github.com/user-attachments/assets/f5b7ad1c-32c7-41e4-a5e2-5098c191c5ec)
+
 ### Setup and Configuration:
 	•	The project uses environment variables to manage API keys and configuration options.
 	•	Libraries used include Pinecone, OpenAI, pdf-parse, and dotenv for environment management.
